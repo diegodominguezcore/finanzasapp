@@ -7,16 +7,22 @@
   --bg: #f6f6f3;
   --surface: #ffffff;
   --text: #141413;
-  --muted: #77776f;
+  --muted: #6f6f68;
   --line: #e7e7e2;
   --income: #1a7f4b;
   --danger: #b42318;
-  --accent: #141413;      /* color de botones principales */
-  --on-accent: #ffffff;   /* texto sobre el color principal */
+  --accent: #141413;        /* color de botones principales */
+  --on-accent: #ffffff;     /* texto sobre el color principal */
 
-  --radius: 16px;
-  --radius-sm: 10px;
+  --chart: #2a78d6;         /* color de barras y medidores */
+  --chart-track: #dbe8f8;   /* fondo de un medidor (misma familia de color) */
+  --bar-glass: rgb(246 246 243 / 0.78); /* barra de pestañas translúcida */
+
+  --radius: 18px;
+  --radius-sm: 12px;
   --gap: 16px;
+  --tabbar-height: 58px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
 
   color-scheme: light dark;
@@ -28,12 +34,16 @@
     --bg: #0e0e0d;
     --surface: #1a1a18;
     --text: #f2f2ee;
-    --muted: #8f8f86;
+    --muted: #96968d;
     --line: #2a2a27;
     --income: #4ade80;
     --danger: #f97066;
     --accent: #f2f2ee;
     --on-accent: #141413;
+
+    --chart: #3987e5;
+    --chart-track: #1d2d42;
+    --bar-glass: rgb(14 14 13 / 0.72);
   }
 }
 
@@ -42,7 +52,11 @@
    ========================================================================== */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;             /* sin agrandar texto en horizontal */
+  -webkit-tap-highlight-color: transparent;   /* sin destello gris al tocar */
+  overscroll-behavior: none;                  /* sin "jalar para recargar" */
+}
 
 body {
   margin: 0;
@@ -52,15 +66,28 @@ body {
   font-size: 16px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
 }
 
-h1, h2, p { margin: 0; }
+h1, h2, h3, p, ul { margin: 0; padding: 0; }
+ul { list-style: none; }
 
 button, input { font: inherit; color: inherit; }
-button { cursor: pointer; border: 0; background: none; padding: 0; }
+
+button {
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+  touch-action: manipulation;      /* quita el retraso de 300 ms al tocar */
+  user-select: none;               /* mantener presionado no selecciona el texto */
+  -webkit-user-select: none;
+}
 
 :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* Todos los números de dinero usan dígitos del mismo ancho, para que no
+   "bailen" cuando cambian y queden alineados en columnas. */
+.num { font-variant-numeric: tabular-nums; }
 
 /* ==========================================================================
    3. Estructura general
@@ -70,10 +97,10 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   max-width: 480px;
   margin: 0 auto;
   padding:
-    calc(env(safe-area-inset-top) + 8px)
-    calc(env(safe-area-inset-right) + var(--gap))
-    calc(env(safe-area-inset-bottom) + 112px)
-    calc(env(safe-area-inset-left) + var(--gap));
+    calc(env(safe-area-inset-top, 0px) + 8px)
+    calc(env(safe-area-inset-right, 0px) + var(--gap))
+    calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-height) + 104px)
+    calc(env(safe-area-inset-left, 0px) + var(--gap));
 }
 
 .topbar {
@@ -83,14 +110,10 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   height: 52px;
 }
 .topbar__side--end { display: flex; justify-content: flex-end; }
+.topbar__title { font-size: 17px; font-weight: 600; text-align: center; }
 
 .month-nav { display: flex; align-items: center; gap: 4px; }
-.month-nav__label {
-  min-width: 150px;
-  text-align: center;
-  font-size: 16px;
-  font-weight: 600;
-}
+.month-nav__label { min-width: 160px; }
 .month-nav__label::first-letter { text-transform: uppercase; }
 
 .icon-btn {
@@ -100,36 +123,57 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   font-size: 20px;
   line-height: 1;
   color: var(--muted);
+  transition: background 120ms var(--ease-out);
 }
 .icon-btn:active { background: var(--line); }
 
-/* ==========================================================================
-   4. Resumen (saldo + totales del mes)
-   ========================================================================== */
-.summary { padding: 28px 0 8px; }
-
-.summary__label { font-size: 13px; color: var(--muted); }
-
-.summary__balance {
-  margin-top: 4px;
-  font-size: 44px;
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums; /* todos los dígitos con el mismo ancho */
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.summary__cards {
+.hint {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   4. Número principal y tarjetas (se usan en las tres pestañas)
+   ========================================================================== */
+.summary, .hero { padding: 24px 4px 4px; }
+
+.hero__label { font-size: 14px; color: var(--muted); }
+.hero__label::first-letter { text-transform: uppercase; }
+
+.hero__value {
+  margin-top: 2px;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.035em;   /* texto grande = letras un poco más juntas */
+  line-height: 1.1;
+}
+.hero__note { margin-top: 6px; font-size: 14px; color: var(--muted); }
+
+.cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 22px;
 }
+
+/* Dentro del bloque del saldo, las tarjetas se alinean con el resto de la página */
+.summary .cards { margin-inline: -4px; }
 
 .card {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 14px 16px;
+  min-width: 0;
 }
 .card__label { font-size: 13px; color: var(--muted); }
 .card__value {
@@ -137,15 +181,29 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
 }
 .card__value--income { color: var(--income); }
+
+/* Tarjeta grande con título, para gráficas y listas */
+.panel {
+  margin-top: 12px;
+  padding: 18px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.panel__title { font-size: 16px; font-weight: 600; }
+.panel__aside { font-size: 13px; color: var(--muted); text-align: right; }
 
 /* ==========================================================================
    5. Lista de movimientos
    ========================================================================== */
-.transactions { margin-top: 20px; }
-
 .day { margin-top: 20px; }
 .day__header {
   display: flex;
@@ -153,7 +211,6 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   padding: 0 4px 8px;
   font-size: 13px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 .day__header span:first-child::first-letter { text-transform: uppercase; }
 
@@ -170,6 +227,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   width: 100%;
   padding: 12px 16px;
   text-align: left;
+  transition: background 120ms var(--ease-out);
 }
 .row + .row { border-top: 1px solid var(--line); }
 .row:active { background: var(--line); }
@@ -192,43 +250,227 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   text-overflow: ellipsis;
 }
 .row__subtitle { font-size: 13px; color: var(--muted); }
-.row__amount {
-  flex: none;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
+.row__amount { flex: none; font-weight: 600; }
 .row__amount--income { color: var(--income); }
 
 .empty {
   margin-top: 56px;
+  padding: 0 24px;
   text-align: center;
   color: var(--muted);
 }
 .empty__title { color: var(--text); font-weight: 600; margin-bottom: 4px; }
+.empty--inline { margin: 4px 0; padding: 0; text-align: left; font-size: 14px; }
 
 /* ==========================================================================
-   6. Botón flotante (+)
+   6. Resumen: barras por categoría y gráfica por día
+   Regla de color: UN solo color para las barras. El texto nunca toma el
+   color de la gráfica; la barra de al lado es la que lo identifica.
    ========================================================================== */
+.bar-list { display: flex; flex-direction: column; gap: 14px; }
+
+.bar-row__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+}
+.bar-row__name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-row__value { flex: none; font-weight: 600; }
+.bar-row__share { margin-left: 6px; font-weight: 400; color: var(--muted); }
+
+.bar-row__track { margin-top: 6px; height: 8px; }
+.bar-row__fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: 0 4px 4px 0;   /* extremo redondeado solo donde termina el dato */
+  background: var(--chart);
+}
+
+.daily-chart { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.daily-chart__bar { fill: var(--chart); transition: opacity 120ms; }
+.daily-chart.has-active .daily-chart__bar { opacity: 0.35; }
+.daily-chart.has-active .daily-chart__bar.is-active { opacity: 1; }
+.daily-chart__axis { stroke: var(--line); stroke-width: 1; }
+.daily-chart__tick { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+.daily-chart__hit { fill: transparent; }
+
+/* ==========================================================================
+   7. Metas: ahorro y deudas
+   ========================================================================== */
+.goal-section { margin-top: 28px; }
+.goal-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 10px;
+}
+.link-btn {
+  padding: 6px 4px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: opacity 120ms;
+}
+.link-btn:active { opacity: 0.5; }
+
+.goal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px 6px 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.goal + .goal { margin-top: 10px; }
+
+.goal__main {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0 10px 16px;
+  text-align: left;
+  transition: opacity 120ms;
+}
+.goal__main:active { opacity: 0.55; }
+
+.goal__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.goal__name {
+  font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.goal__percent { flex: none; font-size: 14px; color: var(--muted); }
+.goal__detail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.goal__detail span { white-space: nowrap; }  /* cada dato baja de línea completo, nunca partido */
+
+.meter {
+  margin-top: 10px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--chart-track);
+  overflow: hidden;
+}
+.meter__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--chart);
+  transition: width 400ms var(--ease-out);
+}
+
+.pill-btn {
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 120ms var(--ease-out), background 120ms;
+}
+.pill-btn:active { transform: scale(0.95); background: var(--line); }
+
+/* ==========================================================================
+   8. Barra de pestañas, botón flotante y aviso
+   ========================================================================== */
+.tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bar-glass);
+  /* Efecto de vidrio: el contenido se ve borroso al pasar por debajo */
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--line);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 112px;
+  height: var(--tabbar-height);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: transform 120ms var(--ease-out), color 120ms;
+}
+.tab:active { transform: scale(0.94); }
+.tab[aria-current="page"] { color: var(--text); }
+.tab svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .fab {
   position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 24px);
-  transform: translateX(-50%);
-  width: 60px;
-  height: 60px;
+  right: calc(env(safe-area-inset-right, 0px) + 20px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-height) + 18px);
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--on-accent);
   font-size: 30px;
   font-weight: 300;
   line-height: 1;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  transition: transform 0.15s ease;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+  transition: transform 140ms var(--ease-out);
 }
-.fab:active { transform: translateX(-50%) scale(0.94); }
+.fab:active { transform: scale(0.92); }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  /* queda arriba del botón + para no taparlo */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-height) + 90px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.22);
+  animation: toast-in 220ms var(--ease-out);
+}
+.toast button { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+@keyframes toast-in {
+  from { transform: translate(-50%, 12px); opacity: 0; }
+  to   { transform: translate(-50%, 0); opacity: 1; }
+}
 
 /* ==========================================================================
-   7. Hojas inferiores (<dialog>)
+   9. Hojas inferiores (<dialog>)
+   Entran desde abajo, que es por donde también se cierran.
    ========================================================================== */
 .sheet {
   width: 100%;
@@ -237,35 +479,49 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   margin: auto auto 0;       /* pegada abajo, centrada horizontalmente */
   padding: 0;
   border: 0;
-  border-radius: 24px 24px 0 0;
+  border-radius: 26px 26px 0 0;
   background: var(--surface);
   color: var(--text);
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;   /* al llegar al final no mueve la página de atrás */
 }
-.sheet::backdrop { background: rgb(0 0 0 / 0.45); }
-.sheet[open] { animation: sheet-in 0.22s ease-out; }
+.sheet::backdrop { background: rgb(0 0 0 / 0.45); animation: fade-in 200ms ease-out; }
+.sheet[open] { animation: sheet-in 320ms var(--ease-out); }
 
 @keyframes sheet-in {
-  from { transform: translateY(24px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .sheet__body {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px);
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
 }
 .sheet__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
-.sheet__header h2 { font-size: 18px; font-weight: 600; }
-.sheet__header .icon-btn { margin-right: -10px; font-size: 16px; }
+.sheet__header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sheet__header .icon-btn { flex: none; margin-right: -10px; font-size: 16px; }
 
 .sheet__text--muted { font-size: 14px; color: var(--muted); }
+.sheet__text--center { margin-top: -10px; text-align: center; }
 .sheet__text--muted:empty { display: none; }
 
 .sheet__actions { display: flex; gap: 10px; }
@@ -274,7 +530,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 .sheet__actions--stack .btn--primary { flex: none; }
 
 /* ==========================================================================
-   8. Controles de formulario
+   10. Controles de formulario
    Nota: los inputs usan 16px o más. Con menos, Safari en iPhone hace zoom
    automático al enfocar el campo.
    ========================================================================== */
@@ -286,7 +542,11 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   background: var(--bg);
 }
 /* El input real se oculta; lo que se ve y se toca es el <span> de al lado */
-.segmented label, .chips label { position: relative; }
+.segmented label, .chips label {
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .segmented input, .chips input {
   position: absolute;
   opacity: 0;
@@ -300,6 +560,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   font-size: 15px;
   font-weight: 500;
   color: var(--muted);
+  transition: background 160ms var(--ease-out), color 160ms;
 }
 .segmented input:checked + span {
   background: var(--surface);
@@ -321,8 +582,8 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   border: 0;
   background: none;
   font-size: 44px;
-  font-weight: 650;
-  letter-spacing: -0.03em;
+  font-weight: 700;
+  letter-spacing: -0.035em;
   outline: none;
 }
 .amount-field input::placeholder { color: var(--line); }
@@ -344,7 +605,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 .field > legend { margin-bottom: 8px; }
 .field input {
   width: 100%;
-  height: 46px;
+  height: 48px;
   padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -361,6 +622,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   border: 1px solid var(--line);
   border-radius: 999px;
   font-size: 14px;
+  transition: background 140ms var(--ease-out), border-color 140ms, color 140ms;
 }
 .chips input:checked + span {
   border-color: var(--accent);
@@ -368,17 +630,63 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   color: var(--on-accent);
 }
 
+.history {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.history li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 4px 14px;
+  font-size: 15px;
+}
+.history li + li { border-top: 1px solid var(--line); }
+.history__date { flex: 1; color: var(--muted); }
+.history__amount { font-weight: 600; }
+.history .icon-btn { font-size: 14px; }
+
 .form-error { font-size: 14px; color: var(--danger); }
 
 .btn {
-  height: 50px;
+  height: 52px;
   padding: 0 20px;
   border-radius: 14px;
   background: var(--bg);
   font-weight: 600;
+  transition: transform 120ms var(--ease-out), opacity 120ms;
 }
-.btn:active { opacity: 0.7; }
+.btn:active { transform: scale(0.97); opacity: 0.8; }
 .btn--primary { background: var(--accent); color: var(--on-accent); }
 .btn--danger { color: var(--danger); }
 
 [hidden] { display: none !important; }
+
+/* ==========================================================================
+   11. Preferencias de accesibilidad del teléfono
+   ========================================================================== */
+
+/* Los efectos al pasar el cursor solo aplican con mouse. En pantallas
+   táctiles el "hover" se queda pegado después de tocar. */
+@media (hover: hover) and (pointer: fine) {
+  .icon-btn:hover, .row:hover { background: var(--line); }
+  .link-btn:hover { opacity: 0.6; }
+}
+
+/* "Reducir movimiento": sin deslizamientos, solo un fundido breve */
+@media (prefers-reduced-motion: reduce) {
+  .sheet[open], .toast { animation: fade-in 150ms ease-out; }
+  .meter__fill, .btn, .fab, .tab, .pill-btn { transition: none; }
+}
+
+/* "Reducir transparencia": barra de pestañas sólida */
+@media (prefers-reduced-transparency: reduce) {
+  .tabbar {
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

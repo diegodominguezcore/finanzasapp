@@ -65,3 +65,30 @@ export function formatDay(isoDate) {
 export function isISODate(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
+
+/** Cuántos días tiene un mes: daysInMonth("2026-02") → 28 */
+export function daysInMonth(monthKey) {
+  const [year, month] = monthKey.split('-').map(Number);
+  return new Date(year, month, 0).getDate(); // día 0 del mes siguiente = último día de este
+}
+
+/**
+ * Días que ya pasaron de un mes. Si es el mes actual, cuenta hasta hoy;
+ * si es un mes pasado (o futuro), cuenta el mes completo.
+ */
+export function elapsedDays(monthKey) {
+  if (monthKey === currentMonthKey()) return new Date().getDate();
+  return daysInMonth(monthKey);
+}
+
+/** "2026-10" → "octubre" */
+export function formatMonthName(monthKey) {
+  const date = fromISODate(`${monthKey}-01`);
+  return new Intl.DateTimeFormat(APP.locale, { month: 'long' }).format(date);
+}
+
+/** "2026-11-12" → "12 nov" */
+export function formatDayShort(isoDate) {
+  return new Intl.DateTimeFormat(APP.locale, { day: 'numeric', month: 'short' })
+    .format(fromISODate(isoDate));
+}

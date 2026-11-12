@@ -10,6 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e0e0d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Finanzas">
@@ -21,30 +22,57 @@
 </head>
 <body>
   <main class="app">
-    <!-- Barra superior: navegación por mes + respaldo -->
+    <!-- Barra superior: navegación por mes (o título de la pestaña) + respaldo -->
     <header class="topbar">
       <span class="topbar__side"></span>
-      <nav class="month-nav" aria-label="Mes">
+      <nav class="month-nav" id="month-nav" aria-label="Mes">
         <button class="icon-btn" id="prev-month" aria-label="Mes anterior">‹</button>
-        <h1 class="month-nav__label" id="month-label"></h1>
+        <h1 class="topbar__title month-nav__label" id="month-label"></h1>
         <button class="icon-btn" id="next-month" aria-label="Mes siguiente">›</button>
       </nav>
+      <h1 class="topbar__title" id="view-title" hidden>Ahorro y deudas</h1>
       <span class="topbar__side topbar__side--end">
         <button class="icon-btn" id="open-backup" aria-label="Respaldo de datos">⋯</button>
       </span>
     </header>
 
-    <!-- Estas dos secciones están vacías a propósito: JavaScript las llena (ver js/ui/) -->
-    <section class="summary" id="summary" aria-label="Resumen"></section>
+    <!-- Cada pestaña es un bloque data-view. Solo uno está visible a la vez
+         (ver render() en js/app.js). Están vacíos: JavaScript los llena. -->
+    <div data-view="home">
+      <section class="summary" id="summary" aria-label="Resumen"></section>
+      <section class="transactions" id="transaction-list" aria-label="Movimientos"></section>
+    </div>
 
-    <section class="transactions" aria-label="Movimientos">
-      <div id="transaction-list"></div>
-    </section>
+    <div data-view="dashboard" id="dashboard" hidden></div>
+
+    <div data-view="goals" id="goals" hidden></div>
   </main>
 
   <button class="fab" id="open-form" aria-label="Agregar movimiento">+</button>
 
-  <!-- Formulario para crear o editar un movimiento -->
+  <!-- Barra de pestañas inferior -->
+  <nav class="tabbar" aria-label="Secciones">
+    <button class="tab" data-tab="home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>
+      <span>Inicio</span>
+    </button>
+    <button class="tab" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20v-8M12 20V5M18 20v-5"/></svg>
+      <span>Resumen</span>
+    </button>
+    <button class="tab" data-tab="goals">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>
+      <span>Metas</span>
+    </button>
+  </nav>
+
+  <!-- Aviso temporal, por ejemplo "Movimiento eliminado · Deshacer" -->
+  <div class="toast" id="toast" role="status" hidden>
+    <span id="toast-message"></span>
+    <button type="button" id="toast-action"></button>
+  </div>
+
+  <!-- Hoja: crear o editar un movimiento -->
   <dialog class="sheet" id="transaction-dialog">
     <form class="sheet__body" id="transaction-form" novalidate>
       <header class="sheet__header">
@@ -70,7 +98,7 @@
 
       <label class="field">
         <span>Descripción</span>
-        <input name="description" type="text" maxlength="60" placeholder="Opcional" autocomplete="off">
+        <input name="description" type="text" maxlength="60" placeholder="Opcional" autocomplete="off" enterkeyhint="done">
       </label>
 
       <label class="field">
@@ -87,7 +115,66 @@
     </form>
   </dialog>
 
-  <!-- Respaldo: exportar / importar los datos -->
+  <!-- Hoja: crear o editar una meta (de ahorro o deuda) -->
+  <dialog class="sheet" id="goal-dialog">
+    <form class="sheet__body" id="goal-form" novalidate>
+      <header class="sheet__header">
+        <h2 id="goal-form-title"></h2>
+        <button type="button" class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      </header>
+
+      <label class="field">
+        <span>Nombre</span>
+        <input name="name" type="text" maxlength="40" autocomplete="off" enterkeyhint="next">
+      </label>
+
+      <label class="field">
+        <span id="goal-target-label"></span>
+        <input name="target" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
+      </label>
+
+      <section class="field" id="goal-history-section" hidden>
+        <span id="goal-history-title"></span>
+        <ul class="history" id="goal-history"></ul>
+      </section>
+
+      <p class="form-error" id="goal-form-error" role="alert" hidden></p>
+
+      <div class="sheet__actions">
+        <button type="button" class="btn btn--danger" id="delete-goal" hidden>Eliminar</button>
+        <button type="submit" class="btn btn--primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Hoja: registrar un aporte (ahorro) o abono (deuda) -->
+  <dialog class="sheet" id="entry-dialog">
+    <form class="sheet__body" id="entry-form" novalidate>
+      <header class="sheet__header">
+        <h2 id="entry-form-title"></h2>
+        <button type="button" class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      </header>
+
+      <label class="amount-field">
+        <span class="amount-field__symbol">Q</span>
+        <input name="amount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" aria-label="Monto">
+      </label>
+      <p class="sheet__text sheet__text--muted sheet__text--center" id="entry-hint"></p>
+
+      <label class="field">
+        <span>Fecha</span>
+        <input name="date" type="date">
+      </label>
+
+      <p class="form-error" id="entry-form-error" role="alert" hidden></p>
+
+      <div class="sheet__actions">
+        <button type="submit" class="btn btn--primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Hoja: respaldo de datos -->
   <dialog class="sheet" id="backup-dialog">
     <div class="sheet__body">
       <header class="sheet__header">

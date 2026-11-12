@@ -23,14 +23,17 @@ export function renderTransactionList(root, groups, { onSelect }) {
     return;
   }
 
-  root.replaceChildren(...groups.map((group) => renderDay(group, onSelect)));
+  root.replaceChildren(
+    ...groups.map((group) => renderDay(group, onSelect)),
+    el('p', { class: 'hint', text: 'Toca un movimiento para editarlo o eliminarlo.' })
+  );
 }
 
 function renderDay(group, onSelect) {
   return el('section', { class: 'day' }, [
     el('header', { class: 'day__header' }, [
       el('span', { text: formatDay(group.date) }),
-      el('span', { text: formatSigned(group.net) })
+      el('span', { class: 'num', text: formatSigned(group.net) })
     ]),
     el('div', { class: 'day__items' },
       group.items.map((transaction) => renderRow(transaction, onSelect))
@@ -57,7 +60,7 @@ function renderRow(transaction, onSelect) {
     el('span', { class: 'row__icon', 'aria-hidden': 'true', text: category.icon }),
     el('div', { class: 'row__text' }, textChildren),
     el('span', {
-      class: isIncome ? 'row__amount row__amount--income' : 'row__amount',
+      class: isIncome ? 'row__amount num row__amount--income' : 'row__amount num',
       text: amountText
     })
   ]);

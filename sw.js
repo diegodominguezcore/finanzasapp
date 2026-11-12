@@ -9,7 +9,7 @@
 //      instalaron la app seguirán viendo la versión anterior.
 // ---------------------------------------------------------------------------
 
-const CACHE_VERSION = 'finanzas-v1';
+const CACHE_VERSION = 'finanzas-v2';
 
 const ASSETS = [
   './',
@@ -22,6 +22,7 @@ const ASSETS = [
   './js/storage.js',
   './js/selectors.js',
   './js/models/transaction.js',
+  './js/models/goal.js',
   './js/utils/money.js',
   './js/utils/dates.js',
   './js/ui/dom.js',
@@ -29,6 +30,11 @@ const ASSETS = [
   './js/ui/transactionList.js',
   './js/ui/transactionForm.js',
   './js/ui/backup.js',
+  './js/ui/charts.js',
+  './js/ui/dashboard.js',
+  './js/ui/goals.js',
+  './js/ui/goalForm.js',
+  './js/ui/toast.js',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png'

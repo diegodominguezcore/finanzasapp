@@ -6,10 +6,14 @@
 // ---------------------------------------------------------------------------
 
 import { $, el, setupSheet } from './dom.js';
-import { isValidTransaction } from '../models/transaction.js';
+import { sanitizeData } from '../storage.js';
 import { todayISO } from '../utils/dates.js';
 
-export function createBackup({ getTransactions, onImport }) {
+/**
+ * @param getData  función que devuelve { transactions, goals }
+ * @param onImport recibe { transactions, goals } y devuelve cuántos registros agregó
+ */
+export function createBackup({ getData, onImport }) {
   const dialog = $('#backup-dialog');
   const status = $('#backup-status');
   const fileInput = $('#import-file');
@@ -17,9 +21,9 @@ export function createBackup({ getTransactions, onImport }) {
   setupSheet(dialog);
 
   async function exportBackup() {
-    const transactions = getTransactions();
+    const { transactions, goals } = getData();
     const content = JSON.stringify(
-      { app: 'finanzas', version: 1, exportedAt: new Date().toISOString(), transactions },
+      { app: 'finanzas', version: 2, exportedAt: new Date().toISOString(), transactions, goals },
       null,
       2
     );
@@ -40,20 +44,19 @@ export function createBackup({ getTransactions, onImport }) {
     const url = URL.createObjectURL(file);
     el('a', { href: url, download: filename }).click();
     URL.revokeObjectURL(url);
-    status.textContent = `Se exportaron ${transactions.length} movimientos.`;
+    status.textContent = `Se exportaron ${transactions.length} movimientos y ${goals.length} metas.`;
   }
 
   async function importBackup(file) {
     try {
-      const data = JSON.parse(await file.text());
-      const list = Array.isArray(data.transactions) ? data.transactions : [];
-      const valid = list.filter(isValidTransaction);
-      const added = onImport(valid);
+      // sanitizeData descarta cualquier registro con forma incorrecta.
+      const data = sanitizeData(JSON.parse(await file.text()));
+      const added = onImport(data);
 
       status.textContent =
         added > 0
-          ? `Se agregaron ${added} movimientos.`
-          : 'El respaldo no tenía movimientos nuevos.';
+          ? `Se agregaron ${added} registros.`
+          : 'El respaldo no tenía registros nuevos.';
     } catch {
       status.textContent = 'Ese archivo no es un respaldo válido.';
     }

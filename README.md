@@ -30,14 +30,26 @@ index.html              Estructura de la pantalla (qué hay)
 css/styles.css          Apariencia (cómo se ve)
 js/
   app.js                Punto de entrada: conecta todas las piezas  ← empieza aquí
-  config.js             Moneda, categorías y otros valores fijos
+  config.js             Moneda, categorías y textos de las metas
   store.js              Estado de la app y las acciones que lo cambian
   storage.js            Guardar / leer del teléfono (localStorage)
-  selectors.js          Cálculos: totales, filtro por mes, agrupar por día
-  models/transaction.js Qué es un movimiento y cuándo es válido
+  selectors.js          Cálculos: totales, por categoría, por día, avance de metas
+  models/
+    transaction.js      Qué es un movimiento y cuándo es válido
+    goal.js             Qué es una meta (ahorro o deuda) y cuándo es válida
   utils/money.js        Convertir y dar formato al dinero
   utils/dates.js        Ayudas para fechas
   ui/                   Cada archivo dibuja una parte de la pantalla
+    summary.js            Inicio: saldo y totales del mes
+    transactionList.js    Inicio: lista de movimientos
+    transactionForm.js    Hoja para crear / editar / eliminar un movimiento
+    dashboard.js          Resumen: gastos del mes
+    charts.js             Las gráficas del resumen (SVG hecho a mano)
+    goals.js              Metas: ahorro y deudas
+    goalForm.js           Hojas para crear una meta y registrar abonos
+    toast.js              Aviso "Eliminado · Deshacer"
+    backup.js             Exportar / importar respaldo
+    dom.js                Ayudas para crear elementos HTML y SVG
 sw.js                   Service worker: permite usar la app sin internet
 manifest.webmanifest    Nombre, ícono y colores de la app instalada
 tests/                  Pruebas automáticas de la lógica
@@ -66,6 +78,23 @@ sola responsabilidad y puedes cambiar uno sin romper los demás.
 - **Solo `storage.js` conoce `localStorage`.** Si luego quieres una base de
   datos, cambias ese archivo y nada más.
 
+- **Lo que se puede calcular no se guarda.** El avance de una meta se obtiene
+  sumando sus abonos cada vez; así nunca hay dos números que se contradigan.
+- **Ahorro y deudas comparten el mismo código.** Por dentro son lo mismo (un
+  monto objetivo y una lista de abonos); solo cambian los textos, que están
+  en `GOAL_TEXT` dentro de `config.js`.
+- **Los datos tienen versión.** `storage.js` lee tanto el formato viejo (sin
+  metas) como el nuevo, para que actualizar la app no borre nada.
+- **Barras en vez de pastel, y un solo color.** Comparar largos es más exacto
+  que comparar ángulos, y el color no hace falta cuando cada barra ya tiene
+  su nombre al lado.
+
+## Cómo se relacionan el saldo y las metas
+
+Son independientes: aportar a una meta de ahorro o abonar a una deuda **no**
+cambia el saldo total. Si pagaste una deuda con tu dinero, regístralo también
+como gasto en Inicio. (Conectar ambas cosas es el ejercicio 6.)
+
 ## Al publicar una versión nueva
 
 En `sw.js` sube `CACHE_VERSION` (`finanzas-v1` → `finanzas-v2`) y agrega a
@@ -79,10 +108,12 @@ Con Node.js instalado: `npm test`.
 ## Ejercicios para practicar (de fácil a difícil)
 
 1. Agrega una categoría nueva en `config.js`.
-2. Cambia los colores en la sección 1 de `styles.css`.
-3. Muestra en el resumen una tercera tarjeta con el balance del mes
-   (pista: `month.net` ya existe en `summary.js`).
-4. Agrega un selector nuevo en `selectors.js` que sume los gastos por
-   categoría, con su test en `tests/logic.test.js`.
-5. Usa ese selector para dibujar un desglose por categoría en un archivo
-   nuevo dentro de `ui/`.
+2. Cambia el color de las gráficas (`--chart`) en la sección 1 de `styles.css`.
+3. Agrega una tercera tarjeta al Resumen con el gasto más grande del mes
+   (pista: mira cómo `dashboard.js` usa `card()`).
+4. Escribe un selector `incomeByCategory` en `selectors.js`, con su test en
+   `tests/logic.test.js`, copiando la idea de `expensesByCategory`.
+5. Muestra en la pestaña Metas la fecha del último abono de cada meta.
+6. Haz que al abonar a una deuda se cree también un gasto automáticamente
+   (pista: en `app.js`, dentro de `onSave` de `entryForm`, puedes llamar a
+   `store.addTransaction`; necesitarás una categoría "Deudas").
